@@ -1,27 +1,26 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import * as z from "zod"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import {toast} from "sonner"
-import { Loader2 } from "lucide-react"
-
-const loginSchema = z.object({
-  email: z.string().email("Email tidak valid"),
-  password: z.string().min(6, "Password minimal 6 karakter"),
-})
-
-type LoginFormData = z.infer<typeof loginSchema>
+import { useAuth } from "@/components/providers/auth-providers";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { LoginFormData, loginSchema } from "@/schemas/auth-schema";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2 } from "lucide-react";
+import { useTransition } from "react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 
 export function LoginForm() {
-  const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
-
+  const [isPending, startTransition] = useTransition();
+  const { login } = useAuth();
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -29,37 +28,40 @@ export function LoginForm() {
       email: "",
       password: "",
     },
-  })
+  });
 
   const onSubmit = async (data: LoginFormData) => {
-    setIsLoading(true)
+    startTransition(async () => {
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(data),
+        });
 
-    try {
-      const response = await fetch("http://localhost:5000/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      })
+        const result = await response.json();
 
-      const result = await response.json()
+        if (response.ok && result.status === "success") {
+          login(result.data.token, result.data.user);
 
-      if (response.ok && result.status === "success") {
-        localStorage.setItem("token", result.data.token)
-        localStorage.setItem("user", JSON.stringify(result.data.user))
-
-        toast.success("Login berhasil")
-        router.push("/dashboard")
-      } else {
-        toast.error(result.message || "Gagal login. Periksa kembali kredensial Anda.")
+          toast.success("Login berhasil!", {
+            description: `Selamat datang, ${result.data.user.name}`,
+          });
+        } else {
+          toast.error("Login gagal", {
+            description: result.message || "Email atau password salah",
+          });
+        }
+      } catch (error) {
+        toast.error("Error", {
+          description:
+            "Terjadi kesalahan saat login. Pastikan API backend berjalan.",
+        });
       }
-    } catch (error) {
-     toast.error("Terjadi kesalahan saat mencoba login.")
-    } finally {
-      setIsLoading(false)
-    }
-  }
+    });
+  };
 
   return (
     <Form {...form}>
@@ -71,7 +73,12 @@ export function LoginForm() {
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
-                <Input type="email" placeholder="nama@email.com" disabled={isLoading} {...field} />
+                <Input
+                  type="email"
+                  placeholder="nama@email.com"
+                  disabled={isPending}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -85,15 +92,20 @@ export function LoginForm() {
             <FormItem>
               <FormLabel>Password</FormLabel>
               <FormControl>
-                <Input type="password" placeholder="••••••••" disabled={isLoading} {...field} />
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  disabled={isPending}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? (
+        <Button type="submit" className="w-full" disabled={isPending}>
+          {isPending ? (
             <>
               <Loader2 className="mr-2 size-4 animate-spin" />
               Memproses...
@@ -104,5 +116,5 @@ export function LoginForm() {
         </Button>
       </form>
     </Form>
-  )
+  );
 }

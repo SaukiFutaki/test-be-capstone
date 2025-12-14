@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { LoginForm } from "@/components/auth/login-form"
-import { RegisterForm } from "@/components/auth/register-form"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LoginForm } from "@/components/auth/login-form";
+import { RegisterForm } from "@/components/auth/register-form";
 
 export function AuthForms() {
   return (
@@ -20,5 +20,5 @@ export function AuthForms() {
         <RegisterForm />
       </TabsContent>
     </Tabs>
-  )
+  );
 }

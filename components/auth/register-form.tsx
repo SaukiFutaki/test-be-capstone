@@ -1,33 +1,27 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import * as z from "zod"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-
-import { Loader2 } from "lucide-react"
-import { toast } from "sonner"
-
-const registerSchema = z
-  .object({
-    name: z.string().min(2, "Nama minimal 2 karakter"),
-    email: z.string().email("Email tidak valid"),
-    password: z.string().min(6, "Password minimal 6 karakter"),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Password tidak cocok",
-    path: ["confirmPassword"],
-  })
-
-type RegisterFormData = z.infer<typeof registerSchema>
+import { useAuth } from "@/components/providers/auth-providers";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { RegisterFormData, registerSchema } from "@/schemas/auth-schema";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2 } from "lucide-react";
+import { useTransition } from "react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 
 export function RegisterForm() {
-  const [isLoading, setIsLoading] = useState(false)
- 
+  const [isPending, startTransition] = useTransition();
+  const { login } = useAuth();
+
   const form = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -36,38 +30,47 @@ export function RegisterForm() {
       password: "",
       confirmPassword: "",
     },
-  })
+  });
 
   const onSubmit = async (data: RegisterFormData) => {
-    setIsLoading(true)
+    startTransition(async () => {
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/auth/register`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              name: data.name,
+              email: data.email,
+              password: data.password,
+            }),
+          }
+        );
 
-    try {
-      const response = await fetch("http://localhost:5000/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: data.name,
-          email: data.email,
-          password: data.password,
-        }),
-      })
+        const result = await response.json();
 
-      const result = await response.json()
+        if (response.ok && result.status === "success") {
+          login(result.data.token, result.data.user);
 
-      if (response.ok && result.status === "success") {
-     toast.success("Registrasi berhasil! Silakan login.")
-        form.reset()
-      } else {
-        toast.error(result.message || "Gagal registrasi. Coba lagi.")
+          toast.success("Registrasi berhasil!", {
+            description: `Selamat datang, ${result.data.user.name}`,
+          });
+        } else {
+          toast.error("Registrasi gagal", {
+            description: result.message || "Terjadi kesalahan saat mendaftar",
+          });
+        }
+      } catch (error) {
+        toast.error("Error", {
+          description:
+            "Terjadi kesalahan saat registrasi. Pastikan API backend berjalan.",
+        });
       }
-    } catch (error) {
-        toast.error("Terjadi kesalahan saat mencoba registrasi.")
-    } finally {
-      setIsLoading(false)
-    }
-  }
+    });
+  };
 
   return (
     <Form {...form}>
@@ -79,7 +82,12 @@ export function RegisterForm() {
             <FormItem>
               <FormLabel>Nama Lengkap</FormLabel>
               <FormControl>
-                <Input type="text" placeholder="John Doe" disabled={isLoading} {...field} />
+                <Input
+                  type="text"
+                  placeholder="John Doe"
+                  disabled={isPending}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -93,7 +101,12 @@ export function RegisterForm() {
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
-                <Input type="email" placeholder="nama@email.com" disabled={isLoading} {...field} />
+                <Input
+                  type="email"
+                  placeholder="nama@email.com"
+                  disabled={isPending}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -107,7 +120,12 @@ export function RegisterForm() {
             <FormItem>
               <FormLabel>Password</FormLabel>
               <FormControl>
-                <Input type="password" placeholder="••••••••" disabled={isLoading} {...field} />
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  disabled={isPending}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -121,15 +139,20 @@ export function RegisterForm() {
             <FormItem>
               <FormLabel>Konfirmasi Password</FormLabel>
               <FormControl>
-                <Input type="password" placeholder="••••••••" disabled={isLoading} {...field} />
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  disabled={isPending}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? (
+        <Button type="submit" className="w-full" disabled={isPending}>
+          {isPending ? (
             <>
               <Loader2 className="mr-2 size-4 animate-spin" />
               Memproses...
@@ -140,5 +163,5 @@ export function RegisterForm() {
         </Button>
       </form>
     </Form>
-  )
+  );
 }
